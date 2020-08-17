@@ -15,11 +15,11 @@ This project is licensed under the Apache-2.0 License.
 
 ## Why?
 
-Because [CloudWatch alarms do not support search expressions](https://stackoverflow.com/a/55826445/9603546). Seriously, that's all. I wanted to use something like this:
+Because [CloudWatch alarms do not support search expressions](https://stackoverflow.com/a/60169862/9603546). Seriously, that's all. I wanted to use something like this:
 
     MAX( SEARCH( ' {CWAgent,AutoScalingGroupName,ImageId,InstanceId,InstanceType,objectname} AutoScalingGroupName="<group>" MetricName="Memory % Committed Bytes In Use" ', 'Maximum', 300 ) )
 
-Instead I needed something that can keep my list of "child" metrics up-to-date as group membership changed. `¯\_(ツ)_/¯`
+Instead I needed something that can keep my list of "child" metrics up-to-date as group membership changes. `¯\_(ツ)_/¯`
 
 ## Usage
 
