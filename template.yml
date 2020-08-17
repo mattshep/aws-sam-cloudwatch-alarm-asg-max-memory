@@ -1,0 +1,96 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: 'AWS::Serverless-2016-10-31'
+Description: "Create or update CloudWatch alarm for maximum memory utilization in an AutoScalingGroup when group membership changes."
+Parameters:
+  SNSTopic:
+    Type: String
+    Description: "The SNS topic for alarm actions."
+    AllowedPattern: "^arn:aws:sns:\\w+-\\w+-\\d+:\\d+:\\w.*$"
+    MinLength: 32
+  AutoScalingGroups:
+    Type: CommaDelimitedList
+    Description: "List of autoscaling group names to receive events from."
+  AlarmPeriod:
+    Type: Number
+    Description: "CloudWatch alarm period."
+    Default: 180
+    MinValue: 60
+  AlarmThreshold:
+    Type: Number
+    Description: "CloudWatch alarm threshold."
+    Default: 75
+    MinValue: 0
+    MaxValue: 100
+  AlarmEvaluationPeriods:
+    Type: Number
+    Description: "CloudWatch alarm evaluation periods."
+    Default: 10
+    MinValue: 1
+Resources:
+  Function:
+    Type: "AWS::Serverless::Function"
+    Properties:
+      Runtime: python3.8
+      Role: !GetAtt Role.Arn
+      Description: "Update memory utilization alarm based on current group membership."
+      Handler: handler.lambda_handler
+      CodeUri: ./code
+      MemorySize: 128
+      Timeout: 60
+      Environment:
+        Variables:
+          SNS_TOPIC: !Ref SNSTopic
+          ALARM_PERIOD: !Ref AlarmPeriod
+          ALARM_THRESHOLD: !Ref AlarmThreshold
+          ALARM_EVALUATION_PERIODS: !Ref AlarmEvaluationPeriods
+      Events:
+        ASG:
+          Type: EventBridgeRule
+          Properties:
+            Pattern:
+              source:
+                - "aws.autoscaling"
+              detail-type:
+                - "EC2 Instance Launch Successful"
+                - "EC2 Instance Terminate Successful"
+              detail:
+                AutoScalingGroupName: !Ref AutoScalingGroups
+  Role:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+        - "arn:aws:iam::aws:policy/service-role/AWSLambdaENIManagementAccess"
+      Policies:
+        -
+          PolicyName: UpdateCWAlarm
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Effect: Allow
+                Action:
+                  - "autoscaling:DescribeAutoScalingGroups"
+                  - "autoscaling:DescribeAutoScalingInstances"
+                Resource: "*"
+              -
+                Effect: Allow
+                Action:
+                  - "ec2:DescribeInstances"
+                Resource: "*"
+              -
+                Effect: Allow
+                Action:
+                  - "cloudwatch:PutMetricAlarm"
+                Resource: !Sub "arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:*-maximum_memory_utilization"
